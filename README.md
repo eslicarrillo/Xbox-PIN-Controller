@@ -1,5 +1,7 @@
 # 🎮 Xbox-PIN-Controller (fork)
 
+🌐 **English** · [Español](README.es.md)
+
 Type your **Windows Hello PIN on the lock / sign-in screen with a game controller**, using a button layout inspired by the Xbox console passkey screen.
 
 This is a fork of [MikeCoder96/Xbox-PIN-Controller](https://github.com/MikeCoder96/Xbox-PIN-Controller). It was reworked and tested on a **Lenovo Legion Go** (built-in controllers, with and without Handheld Companion), on Windows 11 x64. Other controllers and devices follow the same code paths but have not been tested.
