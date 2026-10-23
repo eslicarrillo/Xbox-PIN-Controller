@@ -1,4 +1,4 @@
-LIBRARY SampleV2CredentialProvider.dll
+LIBRARY XboxPINController.dll
 
 EXPORTS
     DllCanUnloadNow                                 PRIVATE

@@ -8,24 +8,27 @@
 //
 // CProvider implements ICredentialProvider, which is the main
 // interface that logonUI uses to decide which tiles to display.
-// In this sample, we will display one tile that uses each of the nine
-// available UI controls.
 
 #include <initguid.h>
 #include "CProvider.h"
 #include "CCredential.h"
 #include "guid.h"
+#include "Logger.h"
 
 CProvider::CProvider():
     _cRef(1),
     _pCredential(nullptr),
+    _fRecreateEnumeratedCredentials(false),
+    _cpus(CPUS_INVALID),
     _pCredProviderUserArray(nullptr)
 {
+    LOG_INFO(L"CProvider::CProvider() creado.");
     DllAddRef();
 }
 
 CProvider::~CProvider()
 {
+    LOG_INFO(L"CProvider::~CProvider() destruyendo...");
     if (_pCredential != nullptr)
     {
         _pCredential->Release();
@@ -38,6 +41,7 @@ CProvider::~CProvider()
     }
 
     DllRelease();
+    LOG_INFO(L"CProvider::~CProvider() destruido.");
 }
 
 // SetUsageScenario is the provider's cue that it's going to be asked for tiles
@@ -48,58 +52,56 @@ HRESULT CProvider::SetUsageScenario(
 {
     HRESULT hr;
 
-    // Decide which scenarios to support here. Returning E_NOTIMPL simply tells the caller
-    // that we're not designed for that scenario.
+    const wchar_t* scenarioName = L"DESCONOCIDO";
+    switch (cpus)
+    {
+    case CPUS_LOGON:
+        scenarioName = L"CPUS_LOGON (Inicio de sesion)";
+        break;
+    case CPUS_UNLOCK_WORKSTATION:
+        scenarioName = L"CPUS_UNLOCK_WORKSTATION (Desbloqueo)";
+        break;
+    case CPUS_CHANGE_PASSWORD:
+        scenarioName = L"CPUS_CHANGE_PASSWORD";
+        break;
+    case CPUS_CREDUI:
+        scenarioName = L"CPUS_CREDUI";
+        break;
+    }
+
+    LOG_INFO(L"CProvider::SetUsageScenario: %s (cpus=%d)", scenarioName, cpus);
+
     switch (cpus)
     {
     case CPUS_LOGON:
     case CPUS_UNLOCK_WORKSTATION:
-        // The reason why we need _fRecreateEnumeratedCredentials is because ICredentialProviderSetUserArray::SetUserArray() is called after ICredentialProvider::SetUsageScenario(),
-        // while we need the ICredentialProviderUserArray during enumeration in ICredentialProvider::GetCredentialCount()
         _cpus = cpus;
         _fRecreateEnumeratedCredentials = true;
         hr = S_OK;
+        LOG_INFO(L"CProvider::SetUsageScenario aceptado (S_OK)");
         break;
 
     case CPUS_CHANGE_PASSWORD:
     case CPUS_CREDUI:
         hr = E_NOTIMPL;
+        LOG_INFO(L"CProvider::SetUsageScenario no implementado para este escenario (E_NOTIMPL)");
         break;
 
     default:
         hr = E_INVALIDARG;
+        LOG_WARN(L"CProvider::SetUsageScenario argumento invalido (E_INVALIDARG)");
         break;
     }
 
     return hr;
 }
 
-// SetSerialization takes the kind of buffer that you would normally return to LogonUI for
-// an authentication attempt.  It's the opposite of ICredentialProviderCredential::GetSerialization.
-// GetSerialization is implement by a credential and serializes that credential.  Instead,
-// SetSerialization takes the serialization and uses it to create a tile.
-//
-// SetSerialization is called for two main scenarios.  The first scenario is in the credui case
-// where it is prepopulating a tile with credentials that the user chose to store in the OS.
-// The second situation is in a remote logon case where the remote client may wish to
-// prepopulate a tile with a username, or in some cases, completely populate the tile and
-// use it to logon without showing any UI.
-//
-// If you wish to see an example of SetSerialization, please see either the SampleCredentialProvider
-// sample or the SampleCredUICredentialProvider sample.  [The logonUI team says, "The original sample that
-// this was built on top of didn't have SetSerialization.  And when we decided SetSerialization was
-// important enough to have in the sample, it ended up being a non-trivial amount of work to integrate
-// it into the main sample.  We felt it was more important to get these samples out to you quickly than to
-// hold them in order to do the work to integrate the SetSerialization changes from SampleCredentialProvider
-// into this sample.]
 HRESULT CProvider::SetSerialization(
     _In_ CREDENTIAL_PROVIDER_CREDENTIAL_SERIALIZATION const * /*pcpcs*/)
 {
     return E_NOTIMPL;
 }
 
-// Called by LogonUI to give you a callback.  Providers often use the callback if they
-// some event would cause them to need to change the set of tiles that they enumerated.
 HRESULT CProvider::Advise(
     _In_ ICredentialProviderEvents * /*pcpe*/,
     _In_ UINT_PTR /*upAdviseContext*/)
@@ -107,18 +109,11 @@ HRESULT CProvider::Advise(
     return E_NOTIMPL;
 }
 
-// Called by LogonUI when the ICredentialProviderEvents callback is no longer valid.
 HRESULT CProvider::UnAdvise()
 {
     return E_NOTIMPL;
 }
 
-// Called by LogonUI to determine the number of fields in your tiles.  This
-// does mean that all your tiles must have the same number of fields.
-// This number must include both visible and invisible fields. If you want a tile
-// to have different fields from the other tiles you enumerate for a given usage
-// scenario you must include them all in this count and then hide/show them as desired
-// using the field descriptors.
 HRESULT CProvider::GetFieldDescriptorCount(
     _Out_ DWORD *pdwCount)
 {
@@ -126,7 +121,6 @@ HRESULT CProvider::GetFieldDescriptorCount(
     return S_OK;
 }
 
-// Gets the field descriptor for a particular field.
 HRESULT CProvider::GetFieldDescriptorAt(
     DWORD dwIndex,
     _Outptr_result_nullonfailure_ CREDENTIAL_PROVIDER_FIELD_DESCRIPTOR **ppcpfd)
@@ -134,7 +128,6 @@ HRESULT CProvider::GetFieldDescriptorAt(
     HRESULT hr;
     *ppcpfd = nullptr;
 
-    // Verify dwIndex is a valid field.
     if ((dwIndex < SFI_NUM_FIELDS) && ppcpfd)
     {
         hr = FieldDescriptorCoAllocCopy(s_rgCredProvFieldDescriptors[dwIndex], ppcpfd);
@@ -147,13 +140,6 @@ HRESULT CProvider::GetFieldDescriptorAt(
     return hr;
 }
 
-// Sets pdwCount to the number of tiles that we wish to show at this time.
-// Sets pdwDefault to the index of the tile which should be used as the default.
-// The default tile is the tile which will be shown in the zoomed view by default. If
-// more than one provider specifies a default the last used cred prov gets to pick
-// the default. If *pbAutoLogonWithDefault is TRUE, LogonUI will immediately call
-// GetSerialization on the credential you've specified as the default and will submit
-// that credential for authentication without showing any further UI.
 HRESULT CProvider::GetCredentialCount(
     _Out_ DWORD *pdwCount,
     _Out_ DWORD *pdwDefault,
@@ -169,13 +155,20 @@ HRESULT CProvider::GetCredentialCount(
         _CreateEnumeratedCredentials();
     }
 
-    *pdwCount = 1;
+    if (_pCredential != nullptr)
+    {
+        *pdwCount = 1;
+        LOG_INFO(L"CProvider::GetCredentialCount: Retornando 1 credencial");
+    }
+    else
+    {
+        *pdwCount = 0;
+        LOG_WARN(L"CProvider::GetCredentialCount: Retornando 0 credenciales (sin credencial)");
+    }
 
     return S_OK;
 }
 
-// Returns the credential at the index specified by dwIndex. This function is called by logonUI to enumerate
-// the tiles.
 HRESULT CProvider::GetCredentialAt(
     DWORD dwIndex,
     _Outptr_result_nullonfailure_ ICredentialProviderCredential **ppcpc)
@@ -185,13 +178,20 @@ HRESULT CProvider::GetCredentialAt(
 
     if ((dwIndex == 0) && ppcpc)
     {
-        hr = _pCredential->QueryInterface(IID_PPV_ARGS(ppcpc));
+        if (_pCredential != nullptr)
+        {
+            hr = _pCredential->QueryInterface(IID_PPV_ARGS(ppcpc));
+            LOG_INFO(L"CProvider::GetCredentialAt: QueryInterface retorno 0x%08X", hr);
+        }
+        else
+        {
+            hr = E_UNEXPECTED;
+            LOG_ERROR(L"CProvider::GetCredentialAt: _pCredential es nulo (E_UNEXPECTED)");
+        }
     }
     return hr;
 }
 
-// This function will be called by LogonUI after SetUsageScenario succeeds.
-// Sets the User Array with the list of users to be enumerated on the logon screen.
 HRESULT CProvider::SetUserArray(_In_ ICredentialProviderUserArray *users)
 {
     if (_pCredProviderUserArray)
@@ -199,7 +199,15 @@ HRESULT CProvider::SetUserArray(_In_ ICredentialProviderUserArray *users)
         _pCredProviderUserArray->Release();
     }
     _pCredProviderUserArray = users;
-    _pCredProviderUserArray->AddRef();
+
+    DWORD userCount = 0;
+    if (_pCredProviderUserArray)
+    {
+        _pCredProviderUserArray->AddRef();
+        _pCredProviderUserArray->GetCount(&userCount);
+    }
+    LOG_INFO(L"CProvider::SetUserArray: %lu usuarios proporcionados por LogonUI", userCount);
+
     return S_OK;
 }
 
@@ -222,6 +230,7 @@ void CProvider::_ReleaseEnumeratedCredentials()
 {
     if (_pCredential != nullptr)
     {
+        LOG_DEBUG(L"CProvider::_ReleaseEnumeratedCredentials: Liberando credencial");
         _pCredential->Release();
         _pCredential = nullptr;
     }
@@ -234,6 +243,8 @@ HRESULT CProvider::_EnumerateCredentials()
     {
         DWORD dwUserCount;
         _pCredProviderUserArray->GetCount(&dwUserCount);
+        LOG_INFO(L"CProvider::_EnumerateCredentials: %lu usuarios encontrados", dwUserCount);
+
         if (dwUserCount > 0)
         {
             ICredentialProviderUser *pCredUser;
@@ -244,8 +255,10 @@ HRESULT CProvider::_EnumerateCredentials()
                 if (_pCredential != nullptr)
                 {
                     hr = _pCredential->Initialize(_cpus, s_rgCredProvFieldDescriptors, s_rgFieldStatePairs, pCredUser);
+                    LOG_INFO(L"CProvider::_EnumerateCredentials: CCredential::Initialize retorno 0x%08X", hr);
                     if (FAILED(hr))
                     {
+                        LOG_ERROR(L"CProvider::_EnumerateCredentials: Falla en CCredential::Initialize (0x%08X)", hr);
                         _pCredential->Release();
                         _pCredential = nullptr;
                     }
@@ -253,6 +266,7 @@ HRESULT CProvider::_EnumerateCredentials()
                 else
                 {
                     hr = E_OUTOFMEMORY;
+                    LOG_ERROR(L"CProvider::_EnumerateCredentials: E_OUTOFMEMORY al instanciar CCredential");
                 }
                 pCredUser->Release();
             }
@@ -261,7 +275,6 @@ HRESULT CProvider::_EnumerateCredentials()
     return hr;
 }
 
-// Boilerplate code to create our provider.
 HRESULT CSample_CreateInstance(_In_ REFIID riid, _Outptr_ void **ppv)
 {
     HRESULT hr;
@@ -274,6 +287,7 @@ HRESULT CSample_CreateInstance(_In_ REFIID riid, _Outptr_ void **ppv)
     else
     {
         hr = E_OUTOFMEMORY;
+        LOG_ERROR(L"CSample_CreateInstance: E_OUTOFMEMORY al instanciar CProvider");
     }
     return hr;
 }

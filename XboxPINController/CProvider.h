@@ -21,12 +21,12 @@ class CProvider : public ICredentialProvider,
     // IUnknown
     IFACEMETHODIMP_(ULONG) AddRef()
     {
-        return ++_cRef;
+        return InterlockedIncrement(&_cRef);
     }
 
     IFACEMETHODIMP_(ULONG) Release()
     {
-        long cRef = --_cRef;
+        long cRef = InterlockedDecrement(&_cRef);
         if (!cRef)
         {
             delete this;

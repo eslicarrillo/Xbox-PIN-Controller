@@ -44,3 +44,17 @@
 /XboxPINController/x64/Release/XboxPINController.ipdb
 /XboxPINController/x64/Release/XboxPINController.log
 /XboxPINController/x64/Release
+
+# --- Local-only material (never publish) ---
+/scratch/
+/backup_pre_fix/
+/config_backup/
+/snapshot_*
+/DEEP_SNAPSHOT_*
+/OS_INPUT_AUDIT.md
+*.ilk
+*.pdb
+*.exp
+/test-controller.*
+/test-provider.*
+/x64/

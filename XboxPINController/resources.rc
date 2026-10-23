@@ -1,6 +1,41 @@
-#include "Resource.h"
+#include <windows.h>
+#include "resource.h"
+#include "version.h"
 
-// Bitmaps:
+// Resources
 IDB_TILE_IMAGE      BITMAP      DISCARDABLE "tileimage.bmp"
-END
+IDR_COMBO_PNG       RCDATA                  "combo.png"
 
+// Version Information
+VS_VERSION_INFO VERSIONINFO
+FILEVERSION     VER_FILE_VERSION
+PRODUCTVERSION  VER_PRODUCT_VERSION
+FILEFLAGSMASK   VS_FFI_FILEFLAGSMASK
+#ifdef _DEBUG
+FILEFLAGS       VS_FF_DEBUG
+#else
+FILEFLAGS       0x0L
+#endif
+FILEOS          VOS_NT_WINDOWS32
+FILETYPE        VFT_DLL
+FILESUBTYPE     VFT2_UNKNOWN
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904b0"
+        BEGIN
+            VALUE "CompanyName",      "MikeCoder96"
+            VALUE "FileDescription",  VER_FILE_DESCRIPTION_STR
+            VALUE "FileVersion",      VER_FILE_VERSION_STR
+            VALUE "InternalName",     VER_INTERNAL_NAME_STR
+            VALUE "LegalCopyright",   VER_COPYRIGHT_STR
+            VALUE "OriginalFilename", VER_ORIGINAL_FILENAME_STR
+            VALUE "ProductName",      VER_PRODUCTNAME_STR
+            VALUE "ProductVersion",   VER_PRODUCT_VERSION_STR
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x0409, 1200
+    END
+END

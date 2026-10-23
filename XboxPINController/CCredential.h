@@ -32,12 +32,12 @@ public:
     // IUnknown
     IFACEMETHODIMP_(ULONG) AddRef()
     {
-        return ++_cRef;
+        return InterlockedIncrement(&_cRef);
     }
 
     IFACEMETHODIMP_(ULONG) Release()
     {
-        long cRef = --_cRef;
+        long cRef = InterlockedDecrement(&_cRef);
         if (!cRef)
         {
             delete this;
@@ -122,6 +122,7 @@ public:
     HWND _hwndPopupWindow;
     POINT _lastMousePos;
     bool _isDragging;
+    ULONG_PTR _gdiplusToken;
                                                                                             // CredentialEvents2 for Begin and EndFieldUpdates.
     BOOL                                    _fChecked;                                      // Tracks the state of our checkbox.
     DWORD                                   _dwComboIndex;                                  // Tracks the current index of our combobox.

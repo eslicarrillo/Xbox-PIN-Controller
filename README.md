@@ -1,53 +1,68 @@
-# 🎮 Xbox-Pin-Controller
+# 🎮 Xbox-PIN-Controller (fork)
 
-Welcome to the **Xbox-Pin-Controller** repository! This project enables Windows users to use their Xbox controllers to input the Windows Hello PIN, utilizing the same PIN schema from the Xbox.
+Type your **Windows Hello PIN on the lock / sign-in screen with a game controller**, using a button layout inspired by the Xbox console passkey screen.
 
-## ✨ Features
+This is a fork of [MikeCoder96/Xbox-PIN-Controller](https://github.com/MikeCoder96/Xbox-PIN-Controller). It was reworked and tested on a **Lenovo Legion Go** (built-in controllers, with and without Handheld Companion), on Windows 11 x64. Other controllers and devices follow the same code paths but have not been tested.
 
-- **Seamless Integration**: Easily log into your Windows system using your Xbox controller.
-- **Familiar Experience**: Use the same PIN input method as on your Xbox console ([PIN Schema](https://miro.medium.com/v2/resize:fit:1400/1*Hu3hz4ktrbt4n35X5_5ulA.png)).
-- **Simple Installation and Removal**: Straightforward steps to set up and remove the controller functionality.
+> ⚠️ **Read before installing.** `XboxPINController.dll` is a Credential Provider: Windows loads it into `LogonUI.exe` and it runs as **SYSTEM** on the sign-in screen, where it reads your controller and injects the keystrokes of your PIN. Only install a DLL you trust. Prefer building it yourself (see below) or at least verify the SHA-256 of the release file.
 
-## 📋 Installation Guide
+## What it does
 
-Follow these steps to install the Xbox-Pin-Controller:
+- **Any controller button wakes the lock screen** (the first press only wakes it), then the PIN box takes the digits.
+- Reads the controller with **DirectInput, Windows.Gaming.Input and XInput** at the same time, so it works on handhelds whose built-in pad is HID-only or XInput-only. One physical press types exactly one digit even if several engines or devices see it.
+- Works on a **cold boot** (no Handheld Companion running) and on **Win+L**.
+- Embedded on-screen guide with the button → digit mapping.
+- Optional diagnostic logging (off by default).
 
-1. **Copy the DLL File**:
-   - 📂 Copy `XboxPINController.dll` to `C:\Windows\System32`.
+| Controller | Types |
+|---|---|
+| D-Pad ↑ ← ↓ → | `1` `2` `3` `4` |
+| LT / RT | `5` / `6` |
+| LB / RB | `7` / `8` |
+| Y / X | `9` / `0` |
+| A | Enter (sign in) |
+| B | Backspace |
 
-2. **Register the DLL**:
-   - 🛠 Execute `register.reg` as an Administrator.
-  
-**NOTE:**
-In case the controller will control the UI in winlogon, add this key on registry:
-\HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Input\Settings\ControllerProcessor\ControllerToVKMapping 
+## Install from a release (no compiler needed)
 
-And add this value:
-Enabled = 0 (DWORD32)
+1. Open the [latest release](../../releases/latest) and download **`XboxPINController.dll`**, **`install.ps1`** and **`uninstall.ps1`** into the same folder.
+2. Verify the DLL: `Get-FileHash .\XboxPINController.dll -Algorithm SHA256` must match the hash in the release notes.
+3. Right-click `install.ps1` → *Run with PowerShell* (it asks for Administrator rights by itself). It copies the DLL to `C:\Windows\System32`, registers the Credential Provider, sets the Windows 11 controller-navigation compatibility value, and, **if [HidHide](https://github.com/nefarius/HidHide) is installed, adds `LogonUI.exe` to its application whitelist** so the sign-in screen can see the controller (Handheld Companion keeps HidHide cloaking the physical pad otherwise).
+4. Lock the PC (Win+L) and press a button on the controller.
 
-## 🗑️ Removal Guide
+**Uninstall:** run `uninstall.ps1` (Administrator). It removes the DLL, the registry entries, restores the compatibility value, and removes `LogonUI.exe` from the HidHide whitelist.
 
-If you wish to remove the Xbox-Pin-Controller, follow these steps:
+Keep another way to sign in available (keyboard, touch, password) while testing. A wrong PIN counts toward the Windows Hello lockout like any other.
 
-1. **Unregister the DLL**:
-   - 🛠 Execute `Unregister.reg` as an Administrator.
+## Build from source
 
-2. **Delete the DLL File**:
-   - 🗂 Delete `XboxPINController.dll` from `C:\Windows\System32`.
+Requires Visual Studio Build Tools 2022 (C++ workload, toolset `v143`) and Windows SDK 10.0.26100.0:
 
-And, if you added the key reported above, proceed to delete it.
+```powershell
+winget install Microsoft.VisualStudio.2022.BuildTools --override "--quiet --wait --norestart --add Microsoft.VisualStudio.Workload.VCTools --add Microsoft.VisualStudio.Component.Windows11SDK.26100 --includeRecommended"
+& "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\MSBuild\Current\Bin\MSBuild.exe" "Xbox Pin Controller.sln" /p:Configuration=Release /p:Platform=x64
+```
 
-Video Tutorial: https://files.fm/u/jatscf4ea9
+The output is `x64\Release\XboxPINController.dll`; `install.ps1` picks it up from there.
 
-## WARNING
+## Logging & diagnostics
 
-These files edit your registry info so I will not assume any responsibility about how you will use this files
+Logging is off by default.
 
-## 🤝 Contributing
+- `enable-logging.ps1` / `disable-logging.ps1` (Administrator) toggle it. `view-log.ps1` shows `C:\Windows\Temp\XboxPINController.log`; it is written by SYSTEM, so reading it needs Administrator.
+- Live output also goes to `OutputDebugStringW` (Sysinternals DebugView).
+- By default the log does **not** record which digit or button was pressed. `HKLM\SOFTWARE\XboxPINController\LogKeys = 1` records them, which is the same as logging your PIN: use it only with a throwaway PIN and turn it off afterwards.
 
-Contributions are welcome! If you have any ideas, issues, or suggestions, feel free to open an issue or submit a pull request.
+## Documentation
 
----
+The technical write-up is in Spanish:
 
-Feel free to reach out if you have any questions or need further assistance.
+- [`SOLUCION_Y_ARQUITECTURA.md`](SOLUCION_Y_ARQUITECTURA.md): root causes (the lock screen takes input on the `Default` desktop, HidHide hiding the pad from LogonUI, the Legion Go switching USB modes, all-zero DirectInput states), architecture and log reference.
+- [`DOCUMENTACION.md`](DOCUMENTACION.md): original technical documentation, with an update note at the top of the changelog.
+- [`PENDIENTES.md`](PENDIENTES.md): open items and untested scenarios.
 
+## Credits and license
+
+- Original project: **MikeCoder96 & Contributors** ([upstream repository](https://github.com/MikeCoder96/Xbox-PIN-Controller)). The credential provider skeleton derives from Microsoft's Windows Credential Provider sample (Copyright © Microsoft Corporation).
+- **License:** the upstream repository does not declare a license, so no license is granted here either: all rights in the original code remain with its authors. The changes in this fork are published for reference and personal use; if you want to redistribute or reuse it, please ask the upstream author.
+- `combo.png` is an original illustration of the button layout, inspired by the Xbox console passkey screen. Xbox is a trademark of Microsoft; this project is not affiliated with or endorsed by Microsoft or Xbox.
